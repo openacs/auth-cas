@@ -1,0 +1,77 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Auth-CAS</title>
+</head>
+<body>
+<h1>Auth-CAS</h1>
+<p>Nima Mazloumi (nima.mazloumi@gmx.de)</p>
+<h2>Introduction</h2>
+<p>The Central Authentication Service [1] is a mechanism that allows Single-Sign-On
+      (SSO) for web-based applications. When activated authentication takes
+      place on a central authentication service and integrated applications
+      provide a CAS client that forwards login and logout requests to a central
+      service and receive a ticket instead. This ticket is used against the
+      central service to validate an active session. If the validation succeeds
+      that user is logged-in automatically. If not the user has to provide a
+      username and a password.
+<p>
+      While the clear benefit is a SSO a SSOut is not supported for CAS releases
+	prio to 3.1. The current package only supports SSO. SSOut is left for
+	future releases. Therefore a logout in OpenACS is not reflected in
+	other integrated systems since the CAS cookie is valid for the whole
+	browser session. To logout safely the user <font color="red"><b>MUST</b></font> close the browser!
+<h2>Dependencies</h2>
+To support https validation this package requires TLS 1.5 or up. If you use OpenSSL/nsopenssl uncomment the <code>ns_httpsget</code> statement in <code>auth-cas-procs.tcl</code> and comment out the tls part.
+<h2>Installation</h2>
+<ol>
+<li>Install tls 1.5
+<pre>
+# Install TLS for https assuming you have installed AOLServer under /usr/local/aolserver45
+wget http://dfn.dl.sourceforge.net/sourceforge/tls/tls1.5.0-src.tar.gz
+tar xzpf tls1.5.0-src.tar.gz
+cd tls1.5
+./configure --with-ssl-dir=/usr --with-tcl=/usr/local/aolserver45/lib --enable-threads --enable-shared --prefix=/usr/local/aolserver45 --exec-prefix=/usr/local/aolserver45
+make install
+</pre>
+or install nsopenssl module. Make sure you change <code>auth-cas-procs.tcl</code> to use <code>ns_httpsget</code>.
+<pre>
+# Install OpenSSL module for https
+# Assuming that OpenSSL is installed an available under /usr/local/ssl and AOLServer under /usr/local/aolserver45
+cd /usr/local/src/aolserver45
+cvs -z3 -d:pserver:anonymous@aolserver.cvs.sourceforge.net:/cvsroot/aolserver co nsopenssl
+cd nsopenssl
+make install OPENSSL=/usr/local/ssl AOLSERVER=/usr/local/aolserver45
+</pre>
+<li>Install this package. An instance of it will be mounted under <code>/cas/</code>. Important is the <code>CasServer</code> parameter. You don't need to change the other parameters. If you don't want to use the standard auth-cas instance change the <code>LocalSsoHandler</code> (defaults to <code>/cas/</code>). Also you can choose between CAS 1.0 and 2.0 validation (parameter <code>ValidationType</code>).
+<li>Open <a href="/acs-admin/auth/">Authorities Administration</a> and create a new authority 'CAS'. Set the authentication parameter to "CAS". Password Management and Account Registration can be set to 'local'.
+<li>Create a new user that exists on your CAS Server, grant the user site-wide admin rights and change the users authority from 'local' to 'CAS'. Write down the <code>user_id</code> of that user. You will need it in case something goes wrong.
+<li>Change the main site subsite parameter <code>LoginTemplate</code> to <code>/packages/auth-cas/lib/login</code>
+<li>Go to the authorities. Move the 'CAS' authority up, enable it and disable the 'local' authority.
+<li>Logout. The system should redirect to the CAS server and request account information. Once you have passed in the correct data you should be forwarded to your OpenACS installation.
+<li>In case something goes wrong create a file called: <code>youropenacsroot/www/autologin.tcl</code> and change the <code>user_id</code> accordingly:
+<pre>
+set user_id foo
+auth::issue_login -user_id $user_id -account_status "ok"
+parameter::set_value -package_id [subsite::main_site_id] -parameter LoginTemplate -value /packages/acs-subsite/lib/login
+ad_set_client_property auth-cas authenticated_p 1
+ad_returnredirect [parameter::get_from_package_key -package_key acs-kernel -parameter IndexRedirectUrl]
+</pre>
+This code will grant you access to the OpenACS installation and reset the subsite parameter.
+</ol>
+<h2>Features</h2>
+<ul>
+<li>CAS 1.0 and 2.0 validation
+<li>HTTP and HTTPS validation if TLS or NSOpenSSL is installed
+<li>SSO
+</ul>
+<h2>Restrictions</h2>
+<ul>
+<li>No SSOut
+<li>CAS client instances must be top level site nodes
+<li>acs-subsite 5.4.0 or up required for <code>LoginTemplate</code> parameter
+</ul>
+<h2>References</h2>
+[1] http://www.ja-sig.org/products/cas/
+</body>
+</html>
